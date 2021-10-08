@@ -1,0 +1,55 @@
+﻿@implements IDisposable
+@inject IJSRuntime JSRuntime
+@using KnowledgeManagerOnline.Models
+@using KnowledgeManagerOnline.Services
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager NavigationManager
+<div id="chatHere">
+    
+</div>
+<hr />
+
+@code {
+
+    //private List<string> messages = new List<string>();
+    //private string userInput;
+    //private string messageInput;
+    //public string result;
+    [Parameter]
+    public string ChatId { get; set; } = "chatComp1";
+
+
+    // DotNetObjectReference<ChatComponent> chatRazorComponent { get; set; }
+
+
+
+    [JSInvokable]
+    public async void RaiseResponseChat(string userId, string chatText)
+    {
+        Console.WriteLine(userId);
+        Console.WriteLine(chatText);
+        //return "made it";
+    }
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            //if (chatRazorComponent == null)
+            //{
+            //    chatRazorComponent = DotNetObjectReference.Create(this);
+            //}
+            var result = await JSRuntime.InvokeAsync<string>("createChatWidget", "createChat", DotNetObjectReference.Create(this), ChatId);
+            Console.WriteLine(result);
+        }
+    }
+    public void Dispose()
+    {
+        //JSRuntime.InvokeVoidAsync("destroyWidgets", chatRazorComponent);
+        //if (chatRazorComponent != null)
+        //{
+        //    chatRazorComponent.Dispose();
+        //}
+    }
+}

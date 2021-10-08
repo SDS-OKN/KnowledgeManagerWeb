@@ -1,0 +1,247 @@
+﻿@page "/"
+@using KnowledgeManagerOnline.Models
+@using KnowledgeManagerOnline.Services
+@using KnowledgeManagerOnline.Components.Tiles
+@using Microsoft.AspNetCore.SignalR.Client
+@inject IJSRuntime JsRuntime
+@inject NavigationManager NavigationManager
+@inject DashboardDataService _dataService
+
+<style type="text/css">
+    #mynetwork {
+        width: 1000px;
+        height: 900px;
+        border: 1px solid lightgray;
+    }
+</style>
+
+<div class="d-flex justify-content-center" style="height:980px">
+    <TelerikSplitter Width="100%" Height="100%" Orientation="@SplitterOrientation.Horizontal" @ref="SplitterRef">
+        <SplitterPanes>
+
+            <SplitterPane Size="300px" Min="50px" Max="350px" Collapsible="true" >
+                <TelerikTabStrip TabPosition="Telerik.Blazor.TabPosition.Top" @ref="myTabStrip" >
+                    <TabStripTab Title="Chat">          
+                        <div style="position:center">
+                            <ChatComponent ChatId="chatComp1"></ChatComponent>
+                        </div>
+                    </TabStripTab>
+                    <TabStripTab Title="Search">
+                        <div>
+                            <label>Text to Search:</label> <TelerikTextArea Id="searchText" Width="80px" AutoSize="true" @bind-Value="@SearchText" ></TelerikTextArea>
+                            <br /> <TelerikButton Id="textSearch" OnClick="FreeTextSearch">Search</TelerikButton>
+                        </div>
+                    </TabStripTab>
+
+                </TelerikTabStrip>
+            </SplitterPane>
+
+            <SplitterPane Collapsible="false">
+                <TelerikSplitter Class="k-pane-flex"
+                                 Width="100%" Height="100%"
+                                 Orientation="@SplitterOrientation.Vertical">
+                    <SplitterPanes>
+                        <SplitterPane Size="40px">
+                            <div>TOP content</div>
+                        </SplitterPane>
+                        <SplitterPane>
+                            <div id="mynetwork" style="height:800px;width:100%"></div>
+                            <TelerikButton Id="showMap" OnClick="ExecuteJavascript" Title="Display Map">Display Map</TelerikButton>
+                        </SplitterPane>
+                    </SplitterPanes>
+                </TelerikSplitter>
+            </SplitterPane>
+
+            <SplitterPane Collapsed="false" Collapsible="true" Resizable="true" Size="200px" Max="450px" Min="60px">
+                <h3>Results</h3>
+            </SplitterPane>
+
+        </SplitterPanes>
+    </TelerikSplitter>
+
+</div>
+
+@code{
+    private DotNetObjectReference<HelloHelper> objRef;
+    Telerik.Blazor.Components.TelerikTabStrip myTabStrip;
+    Telerik.Blazor.Components.TelerikTabStrip ViewScreen;
+    public string SearchText { get; set; }
+    IEnumerable<PodcastViewModel> Podcasts { get; set; }
+    WeeklyRecap WeeklyRecap { get; set; }
+    PerformanceTrend PerformanceTrend { get; set; }
+    PlatformsChart DeviceBreakdown { get; set; }
+    PlatformsChart AppBreakdown { get; set; }
+    Telerik.Blazor.Components.TelerikSplitter SplitterRef { get; set; }
+    List<OntologyClassModel> classItems = new List<OntologyClassModel>();
+    List<InstanceModel> instanceItems = new List<InstanceModel>();
+    public static string LabelToSee { get; set; }
+    List<string> mappingString = new List<string>();
+  
+
+  
+
+    protected async Task startChat()
+    {
+        await JsRuntime.InvokeVoidAsync("startChats", "");
+    }
+
+
+  
+
+
+    public void FreeTextSearch()
+    {
+       // userInput = SearchText;
+       // messageInput = "hello steve";
+        // Send();
+    }
+
+
+    public void ExecuteJavascript()
+    {
+
+        HttpClient client = new HttpClient();
+        string jsText = string.Empty;
+        System.Text.StringBuilder sb = new System.Text.StringBuilder();
+        sb.Append("nodes = [");
+        instanceItems.Clear();
+        classItems.Clear();
+        mappingString.Clear();
+        var classes = client.GetStringAsync("https://maps.mvbg.org/oknReader/api/values/getTest/" + System.Web.HttpUtility.UrlEncode("218")).Result.ToString();
+        var classesList = classes.Split(',').ToList<string>();
+        int counter = 0;
+        Dictionary<int, string> nodesList = new Dictionary<int, string>();
+        Dictionary<string, string> classToNodeList = new Dictionary<string, string>();
+        List<ClassInstanceInfoModel> classModel = new List<ClassInstanceInfoModel>();
+        List<EdgesModel> edgeModels = new List<EdgesModel>();
+        List<System.Drawing.Color> colors = new List<System.Drawing.Color>();
+        // got classes, now add instances
+        var rand = new Random();
+        System.Text.StringBuilder tempSB = new System.Text.StringBuilder();
+        foreach (var item in classesList)
+        {
+            try
+            {
+                counter += 1;
+                string[] itemToView = item.Split("-----");
+                ClassInstanceInfoModel classInfo = new ClassInstanceInfoModel();
+                classInfo.id = counter;
+                classInfo.label = itemToView[0].Replace('"', ' ').Trim();
+                classInfo.title = itemToView[0].Replace('"', ' ').Trim();
+                classInfo.value = 80;
+                classInfo.group = counter;
+                Random randomGen = new Random();
+                System.Drawing.KnownColor[] names = (System.Drawing.KnownColor[])Enum.GetValues(typeof(System.Drawing.KnownColor));
+                System.Drawing.KnownColor randomColorName = names[randomGen.Next(names.Length)];
+                System.Drawing.Color randomColor = System.Drawing.Color.FromKnownColor(randomColorName);
+                classInfo.font = "80px arial " + randomColorName;
+                colors.Add(randomColor);
+
+                classItems.Add(new OntologyClassModel()
+                {
+                    ClassName = itemToView[0].Replace('"', ' ').Trim(),
+                    ClassUri = itemToView[1]
+                });
+                nodesList.Add(counter, itemToView[0].Replace('"', ' ').Trim());
+                classModel.Add(classInfo);
+
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(ex.Message);
+                counter -= 1;
+            }
+
+        }
+        // now get the instances
+        List<InstanceModel> items = new List<InstanceModel>();
+        int offsetIndex = 1;
+        foreach (var classToUse in classItems)
+        {
+
+            var className = classToUse.ClassName;
+            try
+            {
+                classes = client.GetStringAsync("https://maps.mvbg.org/oknReader/api/values/getInstancesClean/" + System.Web.HttpUtility.UrlEncode("218") + "/" + className).Result.ToString();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(ex.Message);
+            }
+            classesList = classes.Split(',').ToList<string>();
+            foreach (var item in classesList)
+            {
+                try
+                {
+                    counter += 1;
+                    ClassInstanceInfoModel classInfo = new ClassInstanceInfoModel();
+                    classInfo.id = counter;
+
+                    classInfo.label = item.Replace('"', ' ').Trim();
+                    classInfo.title = item.Replace('"', ' ').Trim();
+                    classInfo.value = ((counter % 5) + 1) * 5;
+                    System.Drawing.Color color = colors[offsetIndex];
+                    classInfo.font = "10px arial " + color.ToKnownColor().ToString();
+                    classInfo.group = offsetIndex;
+                    instanceItems.Add(new InstanceModel()
+                    {
+                        InstanceName = item.Replace('"', ' ').Trim(),
+                        InstanceUri = item
+                    });
+                    nodesList.Add(counter, item.Replace('"', ' ').Trim());
+                    EdgesModel edge = new EdgesModel();
+                    edge.from = offsetIndex;
+                    edge.to = counter;
+                    edgeModels.Add(edge);
+                    classModel.Add(classInfo);
+
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine(ex.Message);
+                    counter -= 1;
+                }
+            }
+            offsetIndex += 1;
+        }
+        //now build the edges
+        // sb = sb.Remove(sb.Length - 1, 1);
+        var nodesString = JsonConvert.SerializeObject(classModel);
+        var edgesString = JsonConvert.SerializeObject(edgeModels);
+        nodesString = "nodes = " + nodesString + ";";
+        edgesString = "edges = " + edgesString + ";";
+
+        objRef = DotNetObjectReference.Create(new HelloHelper("steve"));
+        var results = JsRuntime.InvokeAsync<string>("redrawAll", objRef, nodesString + " " + edgesString);
+        SplitterState splitterState = new SplitterState();
+        var panes = SplitterRef.GetState();
+
+        SplitterState state = new SplitterState();
+        state = SplitterRef.GetState();
+        var pane = state.Panes[2];
+        pane.Size = "350px";
+        pane.Collapsed = false;
+        SplitterRef.SetState(state);
+
+        Console.WriteLine(results);
+    }
+
+
+    public void Dispose()
+    {
+        objRef?.Dispose();
+    }
+    void ResizeCharts()
+    {
+        WeeklyRecap.Resize();
+        PerformanceTrend.Resize();
+        DeviceBreakdown.Resize();
+        AppBreakdown.Resize();
+    }
+
+    [JSInvokable]
+    public static void GetClassInfo(string nodeName)
+    {
+        LabelToSee = nodeName;
+    }
+}

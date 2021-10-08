@@ -1,0 +1,50 @@
+﻿@page "/Test1"
+@using KnowledgeManagerOnline.Models
+@using KnowledgeManagerOnline.Services
+@using KnowledgeManagerOnline.Components.Tiles
+@using Microsoft.AspNetCore.SignalR.Client
+@inject IJSRuntime JsRuntime
+@inject NavigationManager NavigationManager
+<h3>Test1</h3>
+
+
+@code {
+
+    [Parameter]
+    public string ChatId { get; set; } = "chatComp1";
+
+
+    // DotNetObjectReference<ChatComponent> chatRazorComponent { get; set; }
+
+
+
+    [JSInvokable]
+    public async void RaiseResponseChat(string userId, string chatText)
+    {
+        Console.WriteLine(userId);
+        Console.WriteLine(chatText);
+        //return "made it";
+    }
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            //if (chatRazorComponent == null)
+            //{
+            //    chatRazorComponent = DotNetObjectReference.Create(this);
+            //}
+            var result = await JSRuntime.InvokeAsync<string>("createChatWidget", "createChat", DotNetObjectReference.Create(this), ChatId);
+            Console.WriteLine(result);
+        }
+    }
+    public void Dispose()
+    {
+        //JSRuntime.InvokeVoidAsync("destroyWidgets", chatRazorComponent);
+        //if (chatRazorComponent != null)
+        //{
+        //    chatRazorComponent.Dispose();
+        //}
+    }
+}
